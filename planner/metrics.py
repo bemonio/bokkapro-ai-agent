@@ -1,8 +1,9 @@
 import math
 from planner.dtos import Coord
+import config
 
 
-def haversine_minutes(a: Coord, b: Coord) -> int:
+def distance_km(a: Coord, b: Coord) -> float:
     r = 6371.0
     phi1 = math.radians(a.lat)
     phi2 = math.radians(b.lat)
@@ -18,5 +19,14 @@ def haversine_minutes(a: Coord, b: Coord) -> int:
             )
         )
     )
-    minutes = d / 40 * 60
+    return d
+
+
+def travel_minutes(a: Coord, b: Coord, speed_kmph: int) -> int:
+    km = distance_km(a, b)
+    minutes = km / speed_kmph * 60
     return int(minutes + 0.5)
+
+
+def haversine_minutes(a: Coord, b: Coord) -> int:
+    return travel_minutes(a, b, config.AVERAGE_SPEED_KMPH)

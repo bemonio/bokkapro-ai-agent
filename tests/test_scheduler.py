@@ -21,6 +21,7 @@ async def test_scheduler_job(monkeypatch: pytest.MonkeyPatch) -> None:
             depot=Coord(lat=0.0, lon=0.0),
             vehicle_plans=[],
             unscheduled=[],
+            objective_minutes=0,
         )
 
     async def fake_publish(plan: PlanResultDTO) -> None:

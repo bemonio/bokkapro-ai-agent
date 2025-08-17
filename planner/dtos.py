@@ -20,6 +20,7 @@ class TaskDTO(BaseModel):
     location: Coord
     window: TimeWindow | None
     size: int
+    service_minutes: int | None = None
     model_config = ConfigDict(extra="ignore")
 
 
@@ -27,6 +28,8 @@ class VehiclePlanDTO(BaseModel):
     vehicle_id: str
     tasks_order: list[str]
     eta: list[str]
+    total_minutes: int
+    total_km: float
     model_config = ConfigDict(extra="ignore")
 
 
@@ -35,4 +38,5 @@ class PlanResultDTO(BaseModel):
     depot: Coord
     vehicle_plans: list[VehiclePlanDTO]
     unscheduled: list[str]
+    objective_minutes: int
     model_config = ConfigDict(extra="ignore")

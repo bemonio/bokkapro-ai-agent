@@ -26,6 +26,7 @@ async def test_publish_plan_success(monkeypatch: pytest.MonkeyPatch) -> None:
         depot=Coord(lat=0.0, lon=0.0),
         vehicle_plans=[],
         unscheduled=[],
+        objective_minutes=0,
     )
     await publish_plan(plan)
 
@@ -41,6 +42,7 @@ async def test_publish_plan_error(monkeypatch: pytest.MonkeyPatch) -> None:
         depot=Coord(lat=0.0, lon=0.0),
         vehicle_plans=[],
         unscheduled=[],
+        objective_minutes=0,
     )
     with pytest.raises(ApiError):
         await publish_plan(plan)

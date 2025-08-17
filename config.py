@@ -23,3 +23,11 @@ AUTH_TOKEN: str = os.getenv("AUTH_TOKEN", "")
 DAILY_SCHEDULE_CRON: str = os.getenv("DAILY_SCHEDULE_CRON", "0 7 * * *")
 PLAN_HISTORY_SIZE: int = int(os.getenv("PLAN_HISTORY_SIZE", "10"))
 WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "")
+
+# Planner settings
+USE_MULTI_DEPOT: bool = os.getenv("USE_MULTI_DEPOT", "false").lower() == "true"
+AVERAGE_SPEED_KMPH: int = int(os.getenv("AVERAGE_SPEED_KMPH", "40"))
+SERVICE_TIME_MINUTES_DEFAULT: int = int(os.getenv("SERVICE_TIME_MINUTES_DEFAULT", "5"))
+SOLVER_TIMEOUT_SECONDS: int = int(os.getenv("SOLVER_TIMEOUT_SECONDS", "30"))
+SOLVER_FIRST_SOLUTION: str = os.getenv("SOLVER_FIRST_SOLUTION", "PATH_CHEAPEST_ARC")
+SOLVER_METAHEURISTIC: str = os.getenv("SOLVER_METAHEURISTIC", "GUIDED_LOCAL_SEARCH")
