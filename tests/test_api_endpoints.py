@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 import api.api as api_module
 import planner.service as service
 from api.dtos import VehicleDTO
+from planner.dtos import TaskDTO, Coord
 import config
 import pytest
 
@@ -22,11 +23,24 @@ def test_api_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_get_crews() -> list[object]:
         return []
 
+    async def fake_get_today_stops() -> list[TaskDTO]:
+        return [
+            TaskDTO(
+                id="t1",
+                kind="pickup",
+                location=Coord(lat=0.0, lon=0.0),
+                window=None,
+                size=1,
+            )
+        ]
+
     async def fake_publish(plan: object) -> None:
         return None
 
     monkeypatch.setattr(service, "get_vehicles", fake_get_vehicles)
     monkeypatch.setattr(service, "get_crews", fake_get_crews)
+    monkeypatch.setattr(service, "get_today_stops", fake_get_today_stops)
+    monkeypatch.setattr(service, "save_plan", lambda plan: None)
     monkeypatch.setattr(api_module, "publish_plan", fake_publish)
 
     client = TestClient(api_module.app)

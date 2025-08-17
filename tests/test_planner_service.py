@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import pytest
 from api.dtos import VehicleDTO
 import planner.service as service
-import planner.stops as stops
+from planner.dtos import TaskDTO, Coord
 import config
 
 
@@ -22,11 +22,24 @@ async def test_build_today_plan(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_get_crews() -> list[object]:
         return []
 
+    async def fake_get_today_stops() -> list[TaskDTO]:
+        return [
+            TaskDTO(
+                id="t1",
+                kind="pickup",
+                location=Coord(lat=0.0, lon=0.0),
+                window=None,
+                size=1,
+            )
+        ]
+
     monkeypatch.setattr(service, "get_vehicles", fake_get_vehicles)
     monkeypatch.setattr(service, "get_crews", fake_get_crews)
+    monkeypatch.setattr(service, "get_today_stops", fake_get_today_stops)
+    monkeypatch.setattr(service, "save_plan", lambda plan: None)
 
     plan = await service.build_today_plan()
     assert service.get_latest_plan() is plan
-    stops_data = await stops.get_today_stops()
+    stops_data = await fake_get_today_stops()
     total_assigned = sum(len(v.tasks_order) for v in plan.vehicle_plans)
     assert total_assigned + len(plan.unscheduled) == len(stops_data)
