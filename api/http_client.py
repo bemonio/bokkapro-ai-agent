@@ -3,11 +3,8 @@ from typing import Any
 import httpx
 
 from api.errors import NetworkError
-from config import (
-    HTTP_RETRY_ATTEMPTS,
-    HTTP_RETRY_BACKOFF_SECONDS,
-    HTTP_TIMEOUT_SECONDS,
-)
+from config import HTTP_RETRY_ATTEMPTS, HTTP_RETRY_BACKOFF_SECONDS, HTTP_TIMEOUT_SECONDS
+import config
 
 _client: httpx.AsyncClient | None = None
 
@@ -15,7 +12,15 @@ _client: httpx.AsyncClient | None = None
 async def init_http_client() -> None:
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS)
+
+        async def add_auth_header(request: httpx.Request) -> None:
+            if config.AUTH_TOKEN:
+                request.headers["Authorization"] = f"Bearer {config.AUTH_TOKEN}"
+
+        _client = httpx.AsyncClient(
+            timeout=HTTP_TIMEOUT_SECONDS,
+            event_hooks={"request": [add_auth_header]},
+        )
 
 
 async def close_http_client() -> None:

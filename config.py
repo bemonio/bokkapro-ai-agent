@@ -18,3 +18,8 @@ PLANNING_HORIZON_END: str = os.getenv("PLANNING_HORIZON_END", "18:00")
 REPORTING_POST_URL: str = os.getenv(
     "REPORTING_POST_URL", "https://api.example.com/route_plans"
 )
+STOPS_API_URL: str = os.getenv("STOPS_API_URL", "https://api.example.com/stops")
+AUTH_TOKEN: str = os.getenv("AUTH_TOKEN", "")
+DAILY_SCHEDULE_CRON: str = os.getenv("DAILY_SCHEDULE_CRON", "0 7 * * *")
+PLAN_HISTORY_SIZE: int = int(os.getenv("PLAN_HISTORY_SIZE", "10"))
+WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "")
