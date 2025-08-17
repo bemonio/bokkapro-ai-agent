@@ -26,6 +26,20 @@ uvicorn main:app --reload
 pytest
 ```
 
+## API Layer
+
+Run tests and style checks:
+
+```
+scripts/check.sh
+```
+
+Diagnostics route:
+
+```
+curl http://localhost:8000/diagnostics/sources
+```
+
 ## Environment Variables
 
 See `.env.example` for required settings.
