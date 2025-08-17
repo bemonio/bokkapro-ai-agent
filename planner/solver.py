@@ -1,7 +1,7 @@
 from datetime import datetime
 from planner.dtos import Coord, PlanResultDTO, TaskDTO, VehiclePlanDTO
 from api.dtos import VehicleDTO
-from planner.metrics import haversine_minutes
+from planner.metrics import distance_km, travel_minutes
 import config
 
 
@@ -28,13 +28,14 @@ def solve_plan(
         time = start
         order: list[str] = []
         etas: list[str] = []
+        total_dist = 0.0
         idx = 0
         while idx < len(remaining):
             task = remaining[idx]
             if task.size > cap:
                 idx += 1
                 continue
-            travel = haversine_minutes(loc, task.location)
+            travel = travel_minutes(loc, task.location, config.AVERAGE_SPEED_KMPH)
             arrival = time + travel
             if task.window:
                 ws = _parse_time(task.window.start)
@@ -44,18 +45,32 @@ def solve_plan(
                 if arrival > we:
                     idx += 1
                     continue
-            time = arrival
+            service = task.service_minutes or config.SERVICE_TIME_MINUTES_DEFAULT
+            distance = distance_km(loc, task.location)
+            total_dist += distance
             cap -= task.size
             order.append(task.id)
-            etas.append(_format_time(time))
+            etas.append(_format_time(arrival))
+            time = arrival + service
             loc = task.location
             remaining.pop(idx)
-        plans.append(VehiclePlanDTO(vehicle_id=vehicle.id, tasks_order=order, eta=etas))
-    unscheduled = [t.id for t in remaining]
+        total_minutes = time - start
+        plans.append(
+            VehiclePlanDTO(
+                vehicle_id=vehicle.id,
+                tasks_order=order,
+                eta=etas,
+                total_minutes=total_minutes,
+                total_km=round(total_dist, 2),
+            )
+        )
+    unscheduled = sorted(t.id for t in remaining)
     generated = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    objective = sum(p.total_minutes for p in plans)
     return PlanResultDTO(
         generated_at=generated,
         depot=depot,
         vehicle_plans=plans,
         unscheduled=unscheduled,
+        objective_minutes=objective,
     )

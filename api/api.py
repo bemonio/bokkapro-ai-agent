@@ -6,6 +6,7 @@ from planner.service import (
     publish_plan,
     get_latest_plan,
     replan_incremental,
+    get_plan_metrics,
 )
 from planner.dtos import PlanResultDTO
 from storage.history import get_recent_plans
@@ -30,6 +31,14 @@ async def plan_preview() -> PlanResultDTO:
     if plan is None:
         raise HTTPException(status_code=404)
     return plan
+
+
+@app.get("/agent/plan/metrics")
+async def plan_metrics() -> dict[str, float | int]:
+    metrics = get_plan_metrics()
+    if metrics is None:
+        raise HTTPException(status_code=404)
+    return metrics
 
 
 @app.get("/agent/status")

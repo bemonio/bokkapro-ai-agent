@@ -15,6 +15,7 @@ def _plan(idx: int) -> PlanResultDTO:
         depot=Coord(lat=0.0, lon=0.0),
         vehicle_plans=[],
         unscheduled=[],
+        objective_minutes=0,
     )
 
 
