@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class Vehicle:
     """Represents a delivery vehicle."""
+
     id: int
     status: str
 
@@ -13,5 +14,6 @@ class Vehicle:
 @dataclass
 class Task:
     """Represents a delivery or pickup task."""
+
     id: int
     type: str
