@@ -1,0 +1,19 @@
+{
+  "name": "BokkaPro AI Agent",
+  "context": "..",
+  "dockerFile": "Dockerfile",
+  "runArgs": ["--env-file", ".env"],
+  "settings": {
+    "terminal.integrated.defaultProfile.linux": "bash"
+  },
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance"
+  ],
+  "postCreateCommand": "pip install -r requirements.txt",
+  "remoteEnv": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "forwardPorts": [8000],
+  "remoteUser": "vscode"
+}
