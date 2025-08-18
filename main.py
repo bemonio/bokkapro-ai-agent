@@ -4,7 +4,8 @@ from api.api import app
 from api.http_client import close_http_client, init_http_client
 from api.vehicles import get_vehicles
 from api.crews import get_crews
-from storage.history import init_db
+from storage.history import init_db as init_history_db
+from storage.routes import init_db as init_routes_db
 import scheduler
 
 __all__ = ["app"]
@@ -13,7 +14,8 @@ __all__ = ["app"]
 @app.on_event("startup")
 async def startup() -> None:
     await init_http_client()
-    init_db()
+    init_history_db()
+    init_routes_db()
     scheduler.start()
 
 

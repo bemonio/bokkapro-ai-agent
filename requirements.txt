@@ -7,3 +7,4 @@ respx>=0.20.2
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 APScheduler>=3.10.4
+SQLAlchemy>=2.0.0
