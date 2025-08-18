@@ -10,11 +10,9 @@ from planner.service import (
 )
 from planner.dtos import PlanResultDTO
 from storage.history import get_recent_plans
-from api.routes import router as routes_router
 import config
 
 app = FastAPI()
-app.include_router(routes_router)
 
 
 @app.post("/agent/run")

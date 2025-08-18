@@ -4,11 +4,14 @@ from api.api import app
 from api.http_client import close_http_client, init_http_client
 from api.vehicles import get_vehicles
 from api.crews import get_crews
+from api.routes import router as routes_router
 from storage.history import init_db as init_history_db
 from storage.routes import init_db as init_routes_db
 import scheduler
 
 __all__ = ["app"]
+
+app.include_router(routes_router)
 
 
 @app.on_event("startup")
