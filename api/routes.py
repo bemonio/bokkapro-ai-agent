@@ -15,6 +15,7 @@ from api.schemas import (
     RouteSchema,
     RouteSummarySchema,
     RouteTaskLinkSchema,
+    ScheduleSubmitSchema,
 )
 from storage.routes import DB_PATH, Route as RouteEntity, RouteTaskLink as RouteTaskLinkEntity
 
@@ -32,6 +33,29 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 router = APIRouter(prefix="/routes", tags=["routes"])
+
+
+def _build_route_entity(payload: RouteCreateSchema) -> RouteEntity:
+    """Convert a route creation schema into a `RouteEntity`."""
+
+    route = RouteEntity(
+        date=payload.date,
+        vehicle_id=payload.vehicle_id,
+        crew_id=payload.crew_id,
+        office_id=payload.office_id,
+        total_distance=payload.total_distance,
+        total_duration=payload.total_duration,
+    )
+    for task in payload.tasks:
+        route.tasks.append(
+            RouteTaskLinkEntity(
+                task_id=task.task_id,
+                order=task.order,
+                estimated_start=task.estimated_start,
+                estimated_end=task.estimated_end,
+            )
+        )
+    return route
 
 
 @router.get("/", response_model=List[RouteSummarySchema])
@@ -67,24 +91,7 @@ async def create_route(
 ) -> RouteEntity:
     """Create a new route with its associated tasks."""
 
-    route = RouteEntity(
-        date=payload.date,
-        vehicle_id=payload.vehicle_id,
-        crew_id=payload.crew_id,
-        office_id=payload.office_id,
-        total_distance=payload.total_distance,
-        total_duration=payload.total_duration,
-    )
-    for task in payload.tasks:
-        route.tasks.append(
-            RouteTaskLinkEntity(
-                task_id=task.task_id,
-                order=task.order,
-                estimated_start=task.estimated_start,
-                estimated_end=task.estimated_end,
-            )
-        )
-
+    route = _build_route_entity(payload)
     session.add(route)
     try:
         await session.commit()
@@ -107,4 +114,52 @@ async def delete_route(route_id: UUID, session: AsyncSession = Depends(get_sessi
     await session.commit()
     logger.info("Deleted route %s", route_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/schedule/submit")
+async def submit_schedule(
+    payload: ScheduleSubmitSchema, session: AsyncSession = Depends(get_session)
+) -> dict[str, int]:
+    """Submit a complete daily schedule of routes.
+
+    Existing routes for the same vehicle and date are overwritten.
+    """
+
+    created = 0
+    overwritten = 0
+
+    for route_payload in payload.routes:
+        query = select(RouteEntity).where(
+            RouteEntity.date == route_payload.date,
+            RouteEntity.vehicle_id == route_payload.vehicle_id,
+        )
+        result = await session.execute(query)
+        existing = result.scalars().first()
+        if existing is not None:
+            await session.delete(existing)
+            overwritten += 1
+            logger.info(
+                "Overwriting existing route for vehicle %s on %s",
+                route_payload.vehicle_id,
+                route_payload.date,
+            )
+        else:
+            created += 1
+            logger.info(
+                "Creating route for vehicle %s on %s",
+                route_payload.vehicle_id,
+                route_payload.date,
+            )
+
+        new_route = _build_route_entity(route_payload)
+        session.add(new_route)
+
+    try:
+        await session.commit()
+    except Exception:  # pragma: no cover - safety net
+        logger.exception("Failed to submit schedule")
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to submit schedule")
+
+    return {"created": created, "overwritten": overwritten}
 

@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import List
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationInfo, field_validator
 
 
 class RouteTaskLinkBase(BaseModel):
@@ -70,4 +70,21 @@ class RouteSummarySchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ScheduleSubmitSchema(BaseModel):
+    """Schema for submitting a full day of routes."""
+
+    date: date
+    routes: List[RouteCreateSchema]
+
+    # Inject the shared date into each route before validation
+    @field_validator("routes", mode="before")
+    @classmethod
+    def _apply_date(cls, v: List[dict], info: ValidationInfo) -> List[dict]:
+        sched_date = info.data.get("date")
+        if sched_date is not None:
+            for r in v:
+                r.setdefault("date", sched_date)
+        return v
 
