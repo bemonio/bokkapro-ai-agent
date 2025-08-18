@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Any
 from api.api import app
 from api.http_client import close_http_client, init_http_client
@@ -8,6 +9,9 @@ from api.routes import router as routes_router
 from storage.history import init_db as init_history_db
 from storage.routes import init_db as init_routes_db
 import scheduler
+from agent.planner import generate_basic_schedule
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["app"]
 
@@ -20,6 +24,17 @@ async def startup() -> None:
     init_history_db()
     init_routes_db()
     scheduler.start()
+
+    # Temporary MVP logic - replace with scheduler + cronjob later.
+    logger.info("Starting basic planning on startup")
+
+    async def _run_basic_planning() -> None:
+        try:
+            await generate_basic_schedule()
+        except Exception:
+            logger.exception("Error running basic planning on startup")
+
+    asyncio.create_task(_run_basic_planning())
 
 
 @app.on_event("shutdown")
