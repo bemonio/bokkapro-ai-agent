@@ -1,116 +1,73 @@
-"""FastAPI router for managing planned routes."""
+"""FastAPI router for managing planned routes using async SQLAlchemy."""
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
-from typing import List
+from typing import AsyncGenerator, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
-from storage.routes import Route, RouteTaskLink, SessionLocal
+from api.schemas import (
+    RouteCreateSchema,
+    RouteSchema,
+    RouteSummarySchema,
+    RouteTaskLinkSchema,
+)
+from storage.routes import DB_PATH, Route as RouteEntity, RouteTaskLink as RouteTaskLinkEntity
 
 logger = logging.getLogger(__name__)
+
+
+DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
+engine = create_async_engine(DATABASE_URL, future=True)
+SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with SessionLocal() as session:  # pragma: no cover - generator
+        yield session
+
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
 
-# ---------------------------------------------------------------------------
-# Pydantic Schemas
-# ---------------------------------------------------------------------------
-class RouteTaskLinkBase(BaseModel):
-    """Base information for a task assigned to a route."""
+@router.get("/", response_model=List[RouteSummarySchema])
+async def list_routes(session: AsyncSession = Depends(get_session)) -> List[RouteEntity]:
+    """Return all routes with basic information."""
 
-    task_id: str
-    order: int
-    estimated_start: datetime | None = None
-    estimated_end: datetime | None = None
-
-
-class RouteTaskLinkSchema(RouteTaskLinkBase):
-    """Schema representing a task link within a route."""
-
-    id: UUID
-    route_id: UUID
-
-    class Config:
-        from_attributes = True
-
-
-class RouteTaskLinkCreate(RouteTaskLinkBase):
-    """Schema used when creating task links."""
-
-
-class RouteBase(BaseModel):
-    """Shared route attributes."""
-
-    date: date
-    vehicle_id: str
-    crew_id: str | None = None
-    office_id: str
-    total_distance: float = 0
-    total_duration: float = 0
-
-
-class RouteCreateSchema(RouteBase):
-    """Schema for creating routes."""
-
-    tasks: List[RouteTaskLinkCreate] = []
-
-
-class RouteSchema(RouteBase):
-    """Full route representation."""
-
-    id: UUID
-    created_at: datetime
-    tasks: List[RouteTaskLinkSchema] = []
-
-    class Config:
-        from_attributes = True
-
-
-# ---------------------------------------------------------------------------
-# Database session dependency
-# ---------------------------------------------------------------------------
-
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ---------------------------------------------------------------------------
-# CRUD Endpoints
-# ---------------------------------------------------------------------------
-
-@router.get("/", response_model=List[RouteSchema])
-def list_routes(db: Session = Depends(get_db)) -> List[Route]:
-    """Return all stored routes."""
-
-    routes = db.query(Route).all()
+    result = await session.execute(select(RouteEntity))
+    routes = result.scalars().all()
     logger.debug("Listing %d routes", len(routes))
     return routes
 
 
 @router.get("/{route_id}", response_model=RouteSchema)
-def get_route(route_id: UUID, db: Session = Depends(get_db)) -> Route:
-    """Retrieve a single route by its identifier."""
+async def get_route(route_id: UUID, session: AsyncSession = Depends(get_session)) -> RouteEntity:
+    """Return a route and its ordered tasks."""
 
-    route = db.get(Route, str(route_id))
+    query = (
+        select(RouteEntity)
+        .where(RouteEntity.id == str(route_id))
+        .options(selectinload(RouteEntity.tasks))
+    )
+    result = await session.execute(query)
+    route = result.scalars().first()
     if route is None:
-        raise HTTPException(status_code=404, detail="Route not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+    # tasks relationship is configured with order_by so tasks come sorted
     return route
 
 
-@router.post("/", response_model=RouteSchema, status_code=201)
-def create_route(payload: RouteCreateSchema, db: Session = Depends(get_db)) -> Route:
+@router.post("/", response_model=RouteSchema, status_code=status.HTTP_201_CREATED)
+async def create_route(
+    payload: RouteCreateSchema, session: AsyncSession = Depends(get_session)
+) -> RouteEntity:
     """Create a new route with its associated tasks."""
 
-    route = Route(
+    route = RouteEntity(
         date=payload.date,
         vehicle_id=payload.vehicle_id,
         crew_id=payload.crew_id,
@@ -120,28 +77,34 @@ def create_route(payload: RouteCreateSchema, db: Session = Depends(get_db)) -> R
     )
     for task in payload.tasks:
         route.tasks.append(
-            RouteTaskLink(
+            RouteTaskLinkEntity(
                 task_id=task.task_id,
                 order=task.order,
                 estimated_start=task.estimated_start,
                 estimated_end=task.estimated_end,
             )
         )
-    db.add(route)
-    db.commit()
-    db.refresh(route)
-    logger.info("Created route %s", route.id)
+
+    session.add(route)
+    try:
+        await session.commit()
+    except Exception:  # pragma: no cover - safety net
+        logger.exception("Failed to create route")
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create route")
+    await session.refresh(route)
     return route
 
 
-@router.delete("/{route_id}", status_code=204)
-def delete_route(route_id: UUID, db: Session = Depends(get_db)) -> Response:
-    """Delete a route and its task links."""
+@router.delete("/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_route(route_id: UUID, session: AsyncSession = Depends(get_session)) -> Response:
+    """Delete a route and its linked tasks."""
 
-    route = db.get(Route, str(route_id))
+    route = await session.get(RouteEntity, str(route_id))
     if route is None:
-        raise HTTPException(status_code=404, detail="Route not found")
-    db.delete(route)
-    db.commit()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+    await session.delete(route)
+    await session.commit()
     logger.info("Deleted route %s", route_id)
-    return Response(status_code=204)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
